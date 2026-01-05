@@ -11,9 +11,10 @@ import { DiffViewer } from '@/components/diff/DiffViewer';
 import { ErrorBoundary } from '@/components/graph/ErrorBoundary';
 import { FileUpload } from '@/components/ui/file-upload';
 import { sampleResources as sampleResourcesData, sampleSummary as sampleSummaryData } from '@/data/sampleData';
-import { Resource, DriftSummary } from '@/types/infrastructure';
+import { Resource, DriftSummary, RemediationPlan } from '@/types/infrastructure';
 import { getDriftSeverity, calculateDriftScore } from '@/lib/utils';
 import { parseTerraformStateFile, parseActualStateFile, compareStates, calculateSummary } from '@/lib/terraformParser';
+import { generateRemediationPlan, downloadRemediationPlan, fetchAWSResources } from '@/lib/awsIntegration';
 import {
   CheckCircle,
   AlertTriangle,
@@ -26,6 +27,11 @@ import {
   RefreshCw,
   Database,
   FileJson,
+  Wand2,
+  Cloud,
+  Trash2,
+  Import,
+  ArrowRight,
 } from 'lucide-react';
 
 const InfrastructureGraph = dynamic(
@@ -219,11 +225,13 @@ const SAMPLE_ACTUAL_JSON = JSON.stringify({
 export default function Home() {
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingAWS, setIsLoadingAWS] = useState(false);
   const [plannedState, setPlannedState] = useState<string | null>(null);
   const [actualState, setActualState] = useState<string | null>(null);
   const [resources, setResources] = useState<Resource[]>(sampleResourcesData);
   const [summary, setSummary] = useState<DriftSummary>(sampleSummaryData);
-  const [dataMode, setDataMode] = useState<'sample' | 'custom'>('sample');
+  const [dataMode, setDataMode] = useState<'sample' | 'custom' | 'aws'>('sample');
+  const [remediationPlan, setRemediationPlan] = useState<RemediationPlan | null>(null);
   const graphRef = useRef<{ resetGraph?: () => void }>({});
 
   const handleRefresh = useCallback(async () => {
@@ -235,20 +243,6 @@ export default function Home() {
   const handleNodeSelect = useCallback((resource: Resource | null) => {
     setSelectedResource(resource);
   }, []);
-
-  const handlePlannedLoaded = useCallback((content: string, _filename: string) => {
-    setPlannedState(content);
-    if (actualState) {
-      tryCompare(content, actualState);
-    }
-  }, [actualState]);
-
-  const handleActualLoaded = useCallback((content: string, _filename: string) => {
-    setActualState(content);
-    if (plannedState) {
-      tryCompare(plannedState, content);
-    }
-  }, [plannedState]);
 
   const tryCompare = useCallback((planned: string, actual: string) => {
     try {
@@ -262,6 +256,20 @@ export default function Home() {
       console.error('Error comparing states:', error);
     }
   }, []);
+
+  const handlePlannedLoaded = useCallback((content: string, _filename: string) => {
+    setPlannedState(content);
+    if (actualState) {
+      tryCompare(content, actualState);
+    }
+  }, [actualState, tryCompare]);
+
+  const handleActualLoaded = useCallback((content: string, _filename: string) => {
+    setActualState(content);
+    if (plannedState) {
+      tryCompare(plannedState, content);
+    }
+  }, [plannedState, tryCompare]);
 
   const loadSampleData = useCallback(() => {
     setResources(sampleResourcesData);
@@ -286,6 +294,35 @@ export default function Home() {
       console.error('Error comparing builtin sample:', error);
     }
   }, []);
+
+  const loadAWSResources = useCallback(async () => {
+    setIsLoadingAWS(true);
+    try {
+      const awsResources = await fetchAWSResources({ region: 'us-east-1' });
+      const summary = calculateSummary(awsResources);
+      setResources(awsResources);
+      setSummary(summary);
+      setDataMode('aws');
+      setPlannedState(null);
+      setActualState(null);
+      setSelectedResource(null);
+    } catch (error) {
+      console.error('Error fetching AWS resources:', error);
+    } finally {
+      setIsLoadingAWS(false);
+    }
+  }, []);
+
+  const generatePlan = useCallback(() => {
+    const plan = generateRemediationPlan(resources);
+    setRemediationPlan(plan);
+  }, [resources]);
+
+  const downloadPlan = useCallback(() => {
+    if (remediationPlan) {
+      downloadRemediationPlan(remediationPlan);
+    }
+  }, [remediationPlan]);
 
   const handleResetGraph = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).GraphReset) {
@@ -360,6 +397,10 @@ export default function Home() {
                 />
               </div>
               <div className="flex flex-wrap gap-3">
+                <Button variant="outline" size="sm" onClick={loadAWSResources} disabled={isLoadingAWS}>
+                  <Cloud className="h-4 w-4 mr-2" />
+                  {isLoadingAWS ? 'Fetching...' : 'Fetch from AWS'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={loadBuiltinSample}>
                   <Database className="h-4 w-4 mr-2" />
                   Load Sample Data
@@ -368,6 +409,16 @@ export default function Home() {
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Reset to Demo
                 </Button>
+                <Button variant="default" size="sm" onClick={generatePlan} disabled={resources.length === 0}>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Generate Fix Plan
+                </Button>
+                {remediationPlan && (
+                  <Button variant="outline" size="sm" onClick={downloadPlan}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Plan
+                  </Button>
+                )}
                 {dataMode === 'custom' && (
                   <Badge variant="modified" className="gap-1">
                     <FileJson className="h-3 w-3" />
@@ -498,9 +549,51 @@ export default function Home() {
 
                     <TabsContent value="remediation" className="mt-4">
                       <div className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                          Recommended actions to resolve drift:
-                        </p>
+                        {remediationPlan ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-muted-foreground">
+                                Generated remediation plan with {remediationPlan.totalActions} actions:
+                              </p>
+                              <Badge variant={remediationPlan.riskLevel === 'high' ? 'destructive' : remediationPlan.riskLevel === 'medium' ? 'default' : 'secondary'}>
+                                {remediationPlan.riskLevel} risk
+                              </Badge>
+                            </div>
+                            <div className="space-y-3">
+                        {remediationPlan.actions
+                          .filter(action => action.resourceId === selectedResource.id)
+                          .map((action) => (
+                                  <div key={action.id} className="p-3 bg-muted/50 rounded-lg border">
+                                    <div className="flex items-start gap-3">
+                                      <div className={`mt-0.5 p-1 rounded ${
+                                        action.risk === 'high' ? 'bg-red-500/20 text-red-500' :
+                                        action.risk === 'medium' ? 'bg-yellow-500/20 text-yellow-500' :
+                                        'bg-green-500/20 text-green-500'
+                                      }`}>
+                                        {action.type === 'apply' && <Play className="h-4 w-4" />}
+                                        {action.type === 'import' && <Import className="h-4 w-4" />}
+                                        {action.type === 'destroy' && <Trash2 className="h-4 w-4" />}
+                                        {action.type === 'manual' && <FileCode className="h-4 w-4" />}
+                                      </div>
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium">{action.description}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          Risk: {action.risk} • Time: {action.estimatedTime}
+                                        </p>
+                                        <code className="block mt-2 p-2 bg-background rounded text-xs">
+                                          {action.command}
+                                        </code>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Click &quot;Generate Fix Plan&quot; to create automated remediation steps
+                          </p>
+                        )}
 
                         {selectedResource.status === 'modified' && (
                           <div className="space-y-3">
@@ -543,6 +636,7 @@ export default function Home() {
 
                         {selectedResource.status === 'synced' && (
                           <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                            {/* eslint-disable-next-line react/no-unescaped-entities */}
                             <p className="text-sm text-green-600 dark:text-green-400">
                               This resource is in sync. No action required.
                             </p>

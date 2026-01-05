@@ -44,6 +44,9 @@ This tool helps teams catch these issues early, before they become problems.
 | Drift Score | Get an overall health percentage for your infrastructure |
 | Resource Details | Click any resource to see exactly what changed |
 | Remediation Tips | Get suggested next steps for each type of drift |
+| **One-Click Remediation** | **Generate automated Terraform commands to fix drift** |
+| **AWS Integration** | **Fetch live resources directly from AWS API** |
+| **50+ AWS Resource Types** | **Support for comprehensive AWS infrastructure** |
 | Export | Download your infrastructure view for reports |
 
 ---

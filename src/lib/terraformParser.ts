@@ -1,4 +1,5 @@
 import { Resource, ResourceConfig, DriftStatus, ResourceType, DriftSummary } from '@/types/infrastructure';
+import { mapTerraformTypeToResourceType } from '@/data/awsResourceTypes';
 
 export interface ParsedTerraformState {
   version: number;
@@ -203,25 +204,7 @@ function findConfigDiff(
 }
 
 function mapResourceType(type: string): ResourceType {
-  const typeMap: Record<string, ResourceType> = {
-    'aws_vpc': 'vpc',
-    'aws_subnet': 'subnet',
-    'aws_security_group': 'security_group',
-    'aws_instance': 'ec2',
-    'aws_db_instance': 'rds',
-    'aws_s3_bucket': 's3',
-    'aws_lambda_function': 'lambda',
-    'aws_alb': 'elb',
-    'aws_elb': 'elb',
-    'aws_iam_role': 'iam_role',
-    'aws_api_gateway': 'api_gateway',
-    'aws_cloudfront_distribution': 'cloudfront',
-    'aws_route53_record': 'route53',
-    'aws_ecs_cluster': 'ecs',
-    'aws_eks_cluster': 'eks',
-  };
-
-  return typeMap[type.toLowerCase()] || type.toLowerCase().replace('aws_', '') as ResourceType;
+  return mapTerraformTypeToResourceType(type);
 }
 
 export function calculateSummary(resources: Resource[]): DriftSummary {
