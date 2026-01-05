@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DiffViewer } from '@/components/diff/DiffViewer';
+import { ErrorBoundary } from '@/components/graph/ErrorBoundary';
 import { sampleResources, sampleSummary } from '@/data/sampleData';
 import { Resource } from '@/types/infrastructure';
 import { getDriftSeverity, calculateDriftScore } from '@/lib/utils';
@@ -40,13 +41,15 @@ const statusColors = {
   added: 'text-blue-500',
 };
 
+const REFRESH_SIMULATION_DELAY_MS = 1500;
+
 export default function Home() {
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_SIMULATION_DELAY_MS));
     setIsRefreshing(false);
   }, []);
 
@@ -138,10 +141,18 @@ export default function Home() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="h-[500px] w-full">
-                  <InfrastructureGraph
-                    resources={sampleResources}
-                    onNodeSelect={handleNodeSelect}
-                  />
+                  <ErrorBoundary
+                    fallback={
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        Failed to load infrastructure graph
+                      </div>
+                    }
+                  >
+                    <InfrastructureGraph
+                      resources={sampleResources}
+                      onNodeSelect={handleNodeSelect}
+                    />
+                  </ErrorBoundary>
                 </div>
               </CardContent>
             </Card>

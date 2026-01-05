@@ -26,24 +26,50 @@ const nodeTypes: NodeTypes = {
   resource: ResourceNode,
 };
 
-const getNodePosition = (index: number) => {
-  const cols = 4;
-  const spacing = { x: 280, y: 180 };
-  const row = Math.floor(index / cols);
-  const col = index % cols;
+interface GridLayoutConfig {
+  columns: number;
+  spacingX: number;
+  spacingY: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+const DEFAULT_LAYOUT_CONFIG: GridLayoutConfig = {
+  columns: 4,
+  spacingX: 280,
+  spacingY: 180,
+  offsetX: 100,
+  offsetY: 100,
+};
+
+const getNodePosition = (index: number, config: GridLayoutConfig = DEFAULT_LAYOUT_CONFIG) => {
+  const row = Math.floor(index / config.columns);
+  const col = index % config.columns;
   return {
-    x: 100 + col * spacing.x,
-    y: 100 + row * spacing.y,
+    x: config.offsetX + col * config.spacingX,
+    y: config.offsetY + row * config.spacingY,
   };
 };
 
 export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureGraphProps) {
+  const layoutConfig = useMemo(() => {
+    const resourceCount = resources.length;
+    const optimalColumns = Math.ceil(Math.sqrt(resourceCount));
+    return {
+      columns: Math.max(2, Math.min(optimalColumns, 6)),
+      spacingX: 280,
+      spacingY: 180,
+      offsetX: 100,
+      offsetY: 100,
+    };
+  }, [resources]);
+
   const initialNodes: Node[] = useMemo(
     () =>
       resources.map((resource, index) => ({
         id: resource.id,
         type: 'resource',
-        position: getNodePosition(index),
+        position: getNodePosition(index, layoutConfig),
         data: {
           label: resource.name,
           resourceType: resource.type,
@@ -51,7 +77,7 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
           resource,
         },
       })),
-    [resources]
+    [resources, layoutConfig]
   );
 
   const initialEdges: Edge[] = useMemo(
