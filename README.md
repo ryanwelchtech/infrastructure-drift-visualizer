@@ -45,7 +45,7 @@ This tool helps teams catch these issues early, before they become problems.
 | Resource Details | Click any resource to see exactly what changed |
 | Remediation Tips | Get suggested next steps for each type of drift |
 | **One-Click Remediation** | **Generate automated Terraform commands to fix drift** |
-| **AWS Integration** | **Fetch live resources directly from AWS API** |
+| **AWS Demo Mode** | **Demo infrastructure data showing drift detection capabilities** |
 | **50+ AWS Resource Types** | **Support for comprehensive AWS infrastructure** |
 | Export | Download your infrastructure view for reports |
 
@@ -82,6 +82,23 @@ npm run dev
 ```
 
 Then open `http://localhost:3000` in your browser.
+
+### AWS Demo Mode
+
+The "Fetch from AWS (Demo)" button loads sample infrastructure data to demonstrate drift detection capabilities. To enable real AWS integration:
+
+1. Configure AWS credentials in your environment:
+   ```bash
+   export AWS_ACCESS_KEY_ID=your_access_key
+   export AWS_SECRET_ACCESS_KEY=your_secret_key
+   export AWS_REGION=us-east-1
+   ```
+
+2. Update `src/lib/awsIntegration.ts` to use the AWS SDK:
+   - Replace the mock data with actual `describeInstances()`, `listBuckets()`, etc. calls
+   - Convert AWS API responses to the internal Resource format
+
+3. Deploy to a backend with AWS credentials (Lambda, EC2, or use IAM roles)
 
 ### Run Tests
 

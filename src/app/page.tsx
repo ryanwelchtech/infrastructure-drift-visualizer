@@ -363,8 +363,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800">
       <Navbar
-        onRefresh={handleRefresh}
-        isRefreshing={isRefreshing}
         onResetGraph={handleResetGraph}
         onFitView={handleFitView}
       />
@@ -402,7 +400,7 @@ export default function Home() {
               <div className="flex flex-wrap gap-3">
                 <Button variant="outline" size="sm" onClick={loadAWSResources} disabled={isLoadingAWS}>
                   <Cloud className="h-4 w-4 mr-2" />
-                  {isLoadingAWS ? 'Fetching...' : 'Fetch from AWS'}
+                  {isLoadingAWS ? 'Fetching...' : 'Fetch from AWS (Demo)'}
                 </Button>
                 <Button variant="outline" size="sm" onClick={loadBuiltinSample}>
                   <Database className="h-4 w-4 mr-2" />

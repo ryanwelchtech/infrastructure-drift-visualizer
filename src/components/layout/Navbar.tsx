@@ -21,13 +21,11 @@ import {
 import { cn } from '@/lib/utils';
 
 interface NavbarProps {
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
   onResetGraph?: () => void;
   onFitView?: () => void;
 }
 
-export function Navbar({ onRefresh, isRefreshing, onResetGraph, onFitView }: NavbarProps) {
+export function Navbar({ onResetGraph, onFitView }: NavbarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -77,23 +75,6 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onFitView }: Nav
           </div>
 
           <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onRefresh}
-                  disabled={isRefreshing}
-                  className="relative"
-                >
-                  <RefreshCw
-                    className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Auto-refreshes every 30s</TooltipContent>
-            </Tooltip>
-
             <div className="relative" ref={settingsRef}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -165,27 +146,6 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onFitView }: Nav
                 </div>
               )}
             </div>
-
-            <div className="w-px h-6 bg-border mx-1" />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                >
-                  {theme === 'dark' ? (
-                    <Sun className="h-5 w-5" />
-                  ) : (
-                    <Moon className="h-5 w-5" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-              </TooltipContent>
-            </Tooltip>
           </div>
         </div>
       </nav>
