@@ -10,6 +10,7 @@ import {
   Settings,
   Maximize2,
   ChevronDown,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,9 +24,10 @@ import { cn } from '@/lib/utils';
 interface NavbarProps {
   onResetGraph?: () => void;
   onFitView?: () => void;
+  onExport?: () => void;
 }
 
-export function Navbar({ onResetGraph, onFitView }: NavbarProps) {
+export function Navbar({ onResetGraph, onFitView, onExport }: NavbarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -137,10 +139,13 @@ export function Navbar({ onResetGraph, onFitView }: NavbarProps) {
                   </button>
                   <div className="h-px bg-border my-1" />
                   <button
-                    onClick={() => setShowSettings(false)}
+                    onClick={() => {
+                      onExport?.();
+                      setShowSettings(false);
+                    }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
                   >
-                    <GitCompare className="h-4 w-4" />
+                    <Download className="h-4 w-4" />
                     Export Report
                   </button>
                 </div>
