@@ -232,13 +232,30 @@ export default function Home() {
   const [summary, setSummary] = useState<DriftSummary>(sampleSummaryData);
   const [dataMode, setDataMode] = useState<'sample' | 'custom' | 'aws'>('sample');
   const [remediationPlan, setRemediationPlan] = useState<RemediationPlan | null>(null);
+  const [lastAutoRefresh, setLastAutoRefresh] = useState<Date>(new Date());
   const graphRef = useRef<{ resetGraph?: () => void }>({});
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (dataMode === 'aws') {
+        loadAWSResources();
+        setLastAutoRefresh(new Date());
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [dataMode]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, REFRESH_SIMULATION_DELAY_MS));
+    if (dataMode === 'aws') {
+      await loadAWSResources();
+      setLastAutoRefresh(new Date());
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, REFRESH_SIMULATION_DELAY_MS));
+    }
     setIsRefreshing(false);
-  }, []);
+  }, [dataMode]);
 
   const handleNodeSelect = useCallback((resource: Resource | null) => {
     setSelectedResource(resource);
@@ -331,18 +348,6 @@ export default function Home() {
     setSelectedResource(null);
   }, []);
 
-  const handleZoomIn = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).reactFlowInstance?.zoomIn({ duration: 200 });
-    }
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).reactFlowInstance?.zoomOut({ duration: 200 });
-    }
-  }, []);
-
   const handleFitView = useCallback(() => {
     if (typeof window !== 'undefined') {
       (window as any).reactFlowInstance?.fitView({ duration: 200, padding: 0.2 });
@@ -361,8 +366,6 @@ export default function Home() {
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
         onResetGraph={handleResetGraph}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
         onFitView={handleFitView}
       />
 

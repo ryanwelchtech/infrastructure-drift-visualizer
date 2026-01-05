@@ -8,9 +8,6 @@ import {
   GitCompare,
   RefreshCw,
   Settings,
-  RotateCcw,
-  ZoomIn,
-  ZoomOut,
   Maximize2,
   ChevronDown,
 } from 'lucide-react';
@@ -27,12 +24,10 @@ interface NavbarProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
   onResetGraph?: () => void;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
   onFitView?: () => void;
 }
 
-export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoomOut, onFitView }: NavbarProps) {
+export function Navbar({ onRefresh, isRefreshing, onResetGraph, onFitView }: NavbarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -87,50 +82,6 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoom
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={onZoomIn}
-                  className="hidden sm:flex"
-                >
-                  <ZoomIn className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom In</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onZoomOut}
-                  className="hidden sm:flex"
-                >
-                  <ZoomOut className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Zoom Out</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onFitView}
-                  className="hidden sm:flex"
-                >
-                  <Maximize2 className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Fit View</TooltipContent>
-            </Tooltip>
-
-            <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
                   onClick={onRefresh}
                   disabled={isRefreshing}
                   className="relative"
@@ -140,20 +91,7 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoom
                   />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Refresh State</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onResetGraph}
-                >
-                  <RotateCcw className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Reset Graph</TooltipContent>
+              <TooltipContent>Auto-refreshes every 30s</TooltipContent>
             </Tooltip>
 
             <div className="relative" ref={settingsRef}>
@@ -172,7 +110,10 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoom
               </Tooltip>
 
               {showSettings && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-popover border rounded-lg shadow-lg p-1 z-50">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-popover border rounded-lg shadow-lg p-1 z-50">
+                  <div className="px-3 py-2 text-xs text-muted-foreground border-b mb-1">
+                    Auto-refresh: 30 seconds
+                  </div>
                   <button
                     onClick={() => {
                       setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -200,7 +141,7 @@ export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoom
                     }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RefreshCw className="h-4 w-4" />
                     Reset Graph Layout
                   </button>
                   <button
