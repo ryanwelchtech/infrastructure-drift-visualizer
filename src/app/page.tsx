@@ -286,6 +286,7 @@ export default function Home() {
     }, 30000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataMode]);
 
   const handleRefresh = useCallback(async () => {
@@ -297,6 +298,7 @@ export default function Home() {
       await new Promise((resolve) => setTimeout(resolve, REFRESH_SIMULATION_DELAY_MS));
     }
     setIsRefreshing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataMode]);
 
   const handleNodeSelect = useCallback((resource: Resource | null) => {
