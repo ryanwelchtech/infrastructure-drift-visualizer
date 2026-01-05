@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -11,6 +11,9 @@ import ReactFlow, {
   useEdgesState,
   NodeTypes,
   ConnectionMode,
+  ReactFlowInstance,
+  useReactFlow,
+  Panel,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { ResourceNode } from './ResourceNode';
@@ -51,7 +54,54 @@ const getNodePosition = (index: number, config: GridLayoutConfig = DEFAULT_LAYOU
   };
 };
 
+function GraphControls() {
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <Panel position="top-right" className="flex gap-2">
+      <button
+        onClick={() => zoomIn({ duration: 200 })}
+        className="p-2 bg-background border rounded-lg hover:bg-accent transition-colors"
+        title="Zoom In"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+          <path d="M11 8v6" />
+          <path d="M8 11h6" />
+        </svg>
+      </button>
+      <button
+        onClick={() => zoomOut({ duration: 200 })}
+        className="p-2 bg-background border rounded-lg hover:bg-accent transition-colors"
+        title="Zoom Out"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+          <path d="M8 11h6" />
+        </svg>
+      </button>
+      <button
+        onClick={() => fitView({ duration: 200, padding: 0.2 })}
+        className="p-2 bg-background border rounded-lg hover:bg-accent transition-colors"
+        title="Fit View"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M15 3h6v6" />
+          <path d="M9 21H3v-6" />
+          <path d="M21 3l-7 7" />
+          <path d="M3 21l7-7" />
+        </svg>
+      </button>
+    </Panel>
+  );
+}
+
 export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureGraphProps) {
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+
   const layoutConfig = useMemo(() => {
     const resourceCount = resources.length;
     const optimalColumns = Math.ceil(Math.sqrt(resourceCount));
@@ -76,6 +126,9 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
           status: resource.status,
           resource,
         },
+        draggable: true,
+        selectable: true,
+        focusable: true,
       })),
     [resources, layoutConfig]
   );
@@ -92,6 +145,7 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
             stroke: getStatusColor(resource.status as DriftStatus),
             strokeWidth: 2,
           },
+          type: 'smoothstep',
         }))
       ),
     [resources]
@@ -100,10 +154,17 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const resource = resources.find((r) => r.id === node.id);
-      onNodeSelect(resource || null);
+      if (resource) {
+        onNodeSelect(resource);
+      }
     },
     [resources, onNodeSelect]
   );
@@ -112,8 +173,20 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
     onNodeSelect(null);
   }, [onNodeSelect]);
 
+  const handleReset = useCallback(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    reactFlowInstance?.fitView({ duration: 200, padding: 0.2 });
+  }, [initialNodes, initialEdges, setNodes, setEdges, reactFlowInstance]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).GraphReset = handleReset;
+    }
+  }, [handleReset]);
+
   return (
-    <div className="w-full h-full">
+    <div ref={reactFlowWrapper} className="w-full h-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -121,14 +194,25 @@ export function InfrastructureGraph({ resources, onNodeSelect }: InfrastructureG
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onInit={setReactFlowInstance}
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         fitView
         fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.3}
-        maxZoom={1.5}
+        minZoom={0.1}
+        maxZoom={2}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        nodesDraggable
+        nodesConnectable={false}
+        preventScrolling
+        snapToGrid
+        snapGrid={[20, 20]}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          animated: false,
+        }}
       >
+        <GraphControls />
         <Background color="#888" gap={20} size={1} />
         <Controls className="!rounded-xl !border !border-border" />
         <MiniMap

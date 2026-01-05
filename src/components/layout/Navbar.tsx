@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import {
   Sun,
@@ -8,7 +8,11 @@ import {
   GitCompare,
   RefreshCw,
   Settings,
-  Bell,
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,18 +21,35 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface NavbarProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  onResetGraph?: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onFitView?: () => void;
 }
 
-export function Navbar({ onRefresh, isRefreshing }: NavbarProps) {
+export function Navbar({ onRefresh, isRefreshing, onResetGraph, onZoomIn, onZoomOut, onFitView }: NavbarProps) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   if (!mounted) {
@@ -66,6 +87,50 @@ export function Navbar({ onRefresh, isRefreshing }: NavbarProps) {
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={onZoomIn}
+                  className="hidden sm:flex"
+                >
+                  <ZoomIn className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom In</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onZoomOut}
+                  className="hidden sm:flex"
+                >
+                  <ZoomOut className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Zoom Out</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onFitView}
+                  className="hidden sm:flex"
+                >
+                  <Maximize2 className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Fit View</TooltipContent>
+            </Tooltip>
+
+            <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={onRefresh}
                   disabled={isRefreshing}
                   className="relative"
@@ -80,22 +145,85 @@ export function Navbar({ onRefresh, isRefreshing }: NavbarProps) {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-drift-missing rounded-full" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onResetGraph}
+                >
+                  <RotateCcw className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Notifications</TooltipContent>
+              <TooltipContent>Reset Graph</TooltipContent>
             </Tooltip>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Settings</TooltipContent>
-            </Tooltip>
+            <div className="relative" ref={settingsRef}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowSettings(!showSettings)}
+                  >
+                    <Settings className="h-5 w-5" />
+                    <ChevronDown className={cn('h-3 w-3 ml-1 transition-transform', showSettings && 'rotate-180')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Settings</TooltipContent>
+              </Tooltip>
+
+              {showSettings && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-popover border rounded-lg shadow-lg p-1 z-50">
+                  <button
+                    onClick={() => {
+                      setTheme(theme === 'dark' ? 'light' : 'dark');
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+                  >
+                    {theme === 'dark' ? (
+                      <>
+                        <Sun className="h-4 w-4" />
+                        Switch to Light Mode
+                      </>
+                    ) : (
+                      <>
+                        <Moon className="h-4 w-4" />
+                        Switch to Dark Mode
+                      </>
+                    )}
+                  </button>
+                  <div className="h-px bg-border my-1" />
+                  <button
+                    onClick={() => {
+                      onResetGraph?.();
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reset Graph Layout
+                  </button>
+                  <button
+                    onClick={() => {
+                      onFitView?.();
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    Fit All Nodes
+                  </button>
+                  <div className="h-px bg-border my-1" />
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <GitCompare className="h-4 w-4" />
+                    Export Report
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="w-px h-6 bg-border mx-1" />
 

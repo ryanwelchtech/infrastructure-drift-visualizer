@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/layout/Navbar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -49,6 +49,173 @@ const statusColors = {
 
 const REFRESH_SIMULATION_DELAY_MS = 1500;
 
+const SAMPLE_PLANNED_JSON = JSON.stringify({
+  version: 4,
+  terraform_version: "1.6.0",
+  serial: 42,
+  lineage: "abc123-def456",
+  resources: [
+    {
+      type: "aws_vpc",
+      name: "production",
+      mode: "managed",
+      instances: [{
+        attributes: {
+          id: "vpc-0123456789abcdef0",
+          cidr_block: "10.0.0.0/16",
+          enable_dns_hostnames: true,
+          enable_dns_support: true,
+          tags: { Name: "production-vpc", Environment: "production" }
+        },
+        depends_on: []
+      }]
+    },
+    {
+      type: "aws_subnet",
+      name: "public_1a",
+      mode: "managed",
+      instances: [{
+        attributes: {
+          id: "subnet-0123456789abcdef0",
+          vpc_id: "vpc-0123456789abcdef0",
+          cidr_block: "10.0.1.0/24",
+          availability_zone: "us-east-1a",
+          map_public_ip_on_launch: true,
+          tags: { Name: "public-subnet-1a" }
+        },
+        depends_on: ["aws_vpc.production"]
+      }]
+    },
+    {
+      type: "aws_subnet",
+      name: "private_1a",
+      mode: "managed",
+      instances: [{
+        attributes: {
+          id: "subnet-0123456789abcdef1",
+          vpc_id: "vpc-0123456789abcdef0",
+          cidr_block: "10.0.2.0/24",
+          availability_zone: "us-east-1a",
+          map_public_ip_on_launch: false,
+          tags: { Name: "private-subnet-1a" }
+        },
+        depends_on: ["aws_vpc.production"]
+      }]
+    },
+    {
+      type: "aws_security_group",
+      name: "web",
+      mode: "managed",
+      instances: [{
+        attributes: {
+          id: "sg-0123456789abcdef0",
+          name: "web-sg",
+          vpc_id: "vpc-0123456789abcdef0",
+          ingress: [
+            { from_port: 443, to_port: 443, protocol: "tcp", cidr_blocks: ["0.0.0.0/0"] },
+            { from_port: 80, to_port: 80, protocol: "tcp", cidr_blocks: ["0.0.0.0/0"] }
+          ],
+          egress: [{ from_port: 0, to_port: 0, protocol: "-1", cidr_blocks: ["0.0.0.0/0"] }]
+        },
+        depends_on: ["aws_vpc.production"]
+      }]
+    },
+    {
+      type: "aws_instance",
+      name: "web_server",
+      mode: "managed",
+      instances: [{
+        attributes: {
+          id: "i-0123456789abcdef0",
+          ami: "ami-0abcdef1234567890",
+          instance_type: "t3.medium",
+          key_name: "production-key",
+          monitoring: true,
+          tags: { Name: "web-server-1" }
+        },
+        depends_on: ["aws_subnet.public_1a", "aws_security_group.web"]
+      }]
+    }
+  ]
+}, null, 2);
+
+const SAMPLE_ACTUAL_JSON = JSON.stringify({
+  resources: [
+    {
+      type: "aws_vpc",
+      name: "production",
+      config: {
+        id: "vpc-0123456789abcdef0",
+        cidr_block: "10.0.0.0/16",
+        enable_dns_hostnames: true,
+        enable_dns_support: true,
+        tags: { Name: "production-vpc", Environment: "production" }
+      },
+      depends_on: [],
+      region: "us-east-1"
+    },
+    {
+      type: "aws_subnet",
+      name: "public_1a",
+      config: {
+        id: "subnet-0123456789abcdef0",
+        vpc_id: "vpc-0123456789abcdef0",
+        cidr_block: "10.0.1.0/24",
+        availability_zone: "us-east-1a",
+        map_public_ip_on_launch: true,
+        tags: { Name: "public-subnet-1a" }
+      },
+      depends_on: ["aws_vpc.production"],
+      region: "us-east-1"
+    },
+    {
+      type: "aws_subnet",
+      name: "private_1a",
+      config: {
+        id: "subnet-0123456789abcdef1",
+        vpc_id: "vpc-0123456789abcdef0",
+        cidr_block: "10.0.2.0/24",
+        availability_zone: "us-east-1a",
+        map_public_ip_on_launch: true,
+        tags: { Name: "private-subnet-1a" }
+      },
+      depends_on: ["aws_vpc.production"],
+      region: "us-east-1"
+    },
+    {
+      type: "aws_security_group",
+      name: "web",
+      config: {
+        id: "sg-0123456789abcdef0",
+        name: "web-sg",
+        vpc_id: "vpc-0123456789abcdef0",
+        ingress: [
+          { from_port: 443, to_port: 443, protocol: "tcp", cidr_blocks: ["0.0.0.0/0"] },
+          { from_port: 80, to_port: 80, protocol: "tcp", cidr_blocks: ["0.0.0.0/0"] },
+          { from_port: 22, to_port: 22, protocol: "tcp", cidr_blocks: ["0.0.0.0/0"] }
+        ],
+        egress: [{ from_port: 0, to_port: 0, protocol: "-1", cidr_blocks: ["0.0.0.0/0"] }]
+      },
+      depends_on: ["aws_vpc.production"],
+      region: "us-east-1"
+    },
+    {
+      type: "aws_instance",
+      name: "web_server",
+      config: {
+        id: "i-0123456789abcdef0",
+        ami: "ami-0abcdef1234567890",
+        instance_type: "t3.large",
+        key_name: "production-key",
+        monitoring: false,
+        tags: { Name: "web-server-1" }
+      },
+      depends_on: ["aws_subnet.public_1a", "aws_security_group.web"],
+      region: "us-east-1"
+    }
+  ]
+}, null, 2);
+
 export default function Home() {
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -57,6 +224,7 @@ export default function Home() {
   const [resources, setResources] = useState<Resource[]>(sampleResourcesData);
   const [summary, setSummary] = useState<DriftSummary>(sampleSummaryData);
   const [dataMode, setDataMode] = useState<'sample' | 'custom'>('sample');
+  const graphRef = useRef<{ resetGraph?: () => void }>({});
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -68,24 +236,18 @@ export default function Home() {
     setSelectedResource(resource);
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // Using empty deps array because tryCompare uses refs and doesn't need to be recreated
-  const handlePlannedLoaded = useCallback((content: string) => {
+  const handlePlannedLoaded = useCallback((content: string, _filename: string) => {
     setPlannedState(content);
     if (actualState) {
       tryCompare(content, actualState);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actualState]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  // Using empty deps array because tryCompare uses refs and doesn't need to be recreated
-  const handleActualLoaded = useCallback((content: string) => {
+  const handleActualLoaded = useCallback((content: string, _filename: string) => {
     setActualState(content);
     if (plannedState) {
       tryCompare(plannedState, content);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plannedState]);
 
   const tryCompare = useCallback((planned: string, actual: string) => {
@@ -111,27 +273,42 @@ export default function Home() {
   }, []);
 
   const loadBuiltinSample = useCallback(async () => {
+    setPlannedState(SAMPLE_PLANNED_JSON);
+    setActualState(SAMPLE_ACTUAL_JSON);
     try {
-      const [plannedRes, actualRes] = await Promise.all([
-        fetch('/samples/terraform-planned.json'),
-        fetch('/samples/terraform-actual.json'),
-      ]);
-      const plannedContent = await plannedRes.text();
-      const actualContent = await actualRes.text();
-      setPlannedState(plannedContent);
-      setActualState(actualContent);
-      try {
-        const planned = parseTerraformStateFile(plannedContent);
-        const actual = parseActualStateFile(actualContent);
-        const comparedResources = compareStates(planned, actual);
-        setResources(comparedResources);
-        setSummary(calculateSummary(comparedResources));
-        setDataMode('custom');
-      } catch (error) {
-        console.error('Error comparing builtin sample:', error);
-      }
+      const plannedData = parseTerraformStateFile(SAMPLE_PLANNED_JSON);
+      const actualData = parseActualStateFile(SAMPLE_ACTUAL_JSON);
+      const comparedResources = compareStates(plannedData, actualData);
+      setResources(comparedResources);
+      setSummary(calculateSummary(comparedResources));
+      setDataMode('custom');
     } catch (error) {
-      console.error('Error loading builtin sample:', error);
+      console.error('Error comparing builtin sample:', error);
+    }
+  }, []);
+
+  const handleResetGraph = useCallback(() => {
+    if (typeof window !== 'undefined' && (window as any).GraphReset) {
+      (window as any).GraphReset();
+    }
+    setSelectedResource(null);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).reactFlowInstance?.zoomIn({ duration: 200 });
+    }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).reactFlowInstance?.zoomOut({ duration: 200 });
+    }
+  }, []);
+
+  const handleFitView = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).reactFlowInstance?.fitView({ duration: 200, padding: 0.2 });
     }
   }, []);
 
@@ -143,11 +320,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800">
-      <Navbar onRefresh={handleRefresh} isRefreshing={isRefreshing} />
+      <Navbar
+        onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
+        onResetGraph={handleResetGraph}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onFitView={handleFitView}
+      />
 
       <main className="pt-20 p-4">
         <div className="container mx-auto">
-          {/* Upload Section */}
           <Card className="glass-card mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -162,25 +345,28 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <FileUpload
                   label="Planned State (Terraform)"
-                  description="Upload your Terraform state file"
+                  description="Upload or paste your Terraform state JSON"
                   onFileLoaded={handlePlannedLoaded}
+                  onLoadSample={loadBuiltinSample}
                   acceptedType="planned"
+                  sampleData={SAMPLE_PLANNED_JSON}
                 />
                 <FileUpload
                   label="Actual State (Cloud Resources)"
-                  description="Upload actual state from your cloud provider"
+                  description="Upload or paste actual cloud state JSON"
                   onFileLoaded={handleActualLoaded}
                   acceptedType="actual"
+                  sampleData={SAMPLE_ACTUAL_JSON}
                 />
               </div>
               <div className="flex flex-wrap gap-3">
-                <Button variant="outline" size="sm" onClick={loadSampleData}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Load Demo Data
-                </Button>
                 <Button variant="outline" size="sm" onClick={loadBuiltinSample}>
                   <Database className="h-4 w-4 mr-2" />
-                  Load Built-in Sample
+                  Load Sample Data
+                </Button>
+                <Button variant="outline" size="sm" onClick={loadSampleData}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reset to Demo
                 </Button>
                 {dataMode === 'custom' && (
                   <Badge variant="modified" className="gap-1">
@@ -192,7 +378,6 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <Card className="glass-card">
               <CardContent className="p-4">
@@ -247,9 +432,7 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Graph */}
             <Card className="glass-card lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Infrastructure Graph</CardTitle>
@@ -278,7 +461,6 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Details Panel */}
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle>
@@ -290,7 +472,7 @@ export default function Home() {
                   <Tabs defaultValue="diff">
                     <TabsList className="w-full">
                       <TabsTrigger value="diff" className="flex-1">Diff</TabsTrigger>
-                      <TabsTrigger value="remediation" className="flex-1">Remediation</TabsTrigger>
+                      <TabsTrigger value="remediation" className="flex-1">Fix</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="diff" className="mt-4">
@@ -384,7 +566,6 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* Resource List */}
           <Card className="glass-card mt-6">
             <CardHeader>
               <CardTitle>All Resources ({resources.length})</CardTitle>
